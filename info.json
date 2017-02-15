@@ -1,8 +1,9 @@
 {
-  "name": "dynamic-train-stop",
-  "version": "0.1.3",
-  "title": "Dynamic Train Stops",
-  "author": "Aladrius",
+  "name": "stringy-train-stop",
+  "version": "0.14.0",
+  "title": "Stringy Train Stops",
+  "author": "justarandomgeek based on Aladrius",
   "description": "Rename Train Stations based on Circuit Network Input",
-  "factorio_version": "0.14"
+  "factorio_version": "0.14",
+  "dependencies": ["signalstrings >= 0.14.0"]
 }
