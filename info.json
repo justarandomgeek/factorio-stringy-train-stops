@@ -1,9 +1,9 @@
 {
   "name": "stringy-train-stop",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "title": "Stringy Train Stops",
   "author": "justarandomgeek based on Aladrius",
-  "description": "Rename Train Stations based on Circuit Network Input",
+  "description": "Rename train stations and dispatch trains based on circuit signals",
   "factorio_version": "0.14",
   "dependencies": ["signalstrings >= 0.14.0"]
 }

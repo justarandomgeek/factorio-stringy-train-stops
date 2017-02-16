@@ -60,22 +60,32 @@ function removeStringyStation(entity)
 end
 
 function updateStringyStation(entity)
-	local stationNewName = string.match(entity.backer_name, '.*|')
-	if stationNewName ~= nil	then
-		local net = entity.get_circuit_network(defines.wire_type.red) or entity.get_circuit_network(defines.wire_type.green)
+  local net = entity.get_circuit_network(defines.wire_type.red) or entity.get_circuit_network(defines.wire_type.green)
+  --TODO: fetch both and combine them? would kill performance...
 
-    --TODO: fetch both and combine them? would kill performance...
-
-    if net then
+  if net and #net.signals > 0 then
+    -- use *vanilla* train stop signal
+    if net.get_signal({name="train-stop",type="item"}) == 1 then
+      -- rename station
       local string = remote.call('signalstrings','signals_to_string',net.signals)
-  		stationNewName = stationNewName .. string
-    end
+      if string ~= entity.backer_name then
+  			renameStringyStation(entity, string)
+  		end
 
-		if stationNewName ~= entity.backer_name
-			then
-			renameStringyStation(entity, stationNewName)
-		end
-	end
+
+    elseif net.get_signal({name="diesel-locomotive",type="item"}) == 1 then
+      -- send train to named station
+      for _,train in pairs(entity.surface.find_entities_filtered{area={{x=entity.position.x-2,y=entity.position.y-2},{x=entity.position.x+2,y=entity.position.y+2}},type='locomotive'}) do
+        if train.train.state == defines.train_state.wait_station and train.train.station == entity then
+          local string = remote.call('signalstrings','signals_to_string',net.signals)
+
+          train.train.manual_mode = true
+          train.train.schedule = { current = 1, records = {{station=string}}}
+          train.train.manual_mode = false
+        end
+      end
+    end
+  end
 end
 
 function renameStringyStation(entity, stationNewName)
