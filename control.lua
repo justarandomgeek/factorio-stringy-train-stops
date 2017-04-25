@@ -63,7 +63,7 @@ function updateStringyStation(entity)
   local net = entity.get_circuit_network(defines.wire_type.red) or entity.get_circuit_network(defines.wire_type.green)
   --TODO: fetch both and combine them? would kill performance...
 
-  if net and #net.signals > 0 then
+  if net and net.signals and #net.signals > 0 then
     -- use *vanilla* train stop signal
     if net.get_signal({name="train-stop",type="item"}) == 1 then
       -- rename station
@@ -73,7 +73,7 @@ function updateStringyStation(entity)
   		end
 
 
-    elseif net.get_signal({name="diesel-locomotive",type="item"}) == 1 then
+    elseif net.get_signal({name="locomotive",type="item"}) == 1 then
       -- send train to named station
       for _,train in pairs(entity.surface.find_entities_filtered{area={{x=entity.position.x-2,y=entity.position.y-2},{x=entity.position.x+2,y=entity.position.y+2}},type='locomotive'}) do
         if train.train.state == defines.train_state.wait_station and train.train.station == entity then
