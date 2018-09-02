@@ -1,6 +1,6 @@
 {
   "name": "stringy-train-stop",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "title": "Stringy Train Stops",
   "author": "justarandomgeek based on Aladrius",
   "description": "Rename train stations and dispatch trains based on circuit signals",

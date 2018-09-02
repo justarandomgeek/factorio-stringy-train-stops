@@ -175,12 +175,32 @@ function renameStringyStation(entity, stationNewName)
 	stationDirection = entity.direction
 	stationForce = entity.force
 	stationCircuits = entity.circuit_connection_definitions
+
+	stationControlBehavior = entity.get_control_behavior()
+
+	stationSendToTrain = stationControlBehavior.send_to_train
+	stationReadFromTrain = stationControlBehavior.read_from_train
+	stationReadStoppedTrain = stationControlBehavior.read_stopped_train
+	stationEnableDisable = stationControlBehavior.enable_disable
+	stationStoppedTrainSignal = stationControlBehavior.stopped_train_signal
+	stationCircuitCondition = stationControlBehavior.circuit_condition
+
 	removeStringyStation(entity)
 	entity.destroy()
 	newStation = game.surfaces[1].create_entity{name = stationName, position = stationPosition, direction = stationDirection, force = stationForce}
 	for i, wire in ipairs(stationCircuits) do
 		newStation.connect_neighbour(wire)
 	end
+
+	newStationControlBehavior = newStation.get_control_behavior()
+
+	newStationControlBehavior.send_to_train = stationSendToTrain
+	newStationControlBehavior.read_from_train = stationReadFromTrain
+	newStationControlBehavior.read_stopped_train = stationReadStoppedTrain
+	newStationControlBehavior.enable_disable = stationEnableDisable
+	newStationControlBehavior.stopped_train_signal = stationStoppedTrainSignal
+	newStationControlBehavior.circuit_condition = stationCircuitCondition
+
 	addDTSToTable(newStation)
 	newStation.backer_name = stationNewName
 end
