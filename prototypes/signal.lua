@@ -69,5 +69,13 @@ data:extend(
     icon_size = 32,
     subgroup = "virtual-signal-stringytrains",
     order = "z[stringytrains]-[8]"
+  },
+  {
+    type = "virtual-signal",
+    name = "signal-wait-passenger",
+    icon = "__stringy-train-stop__/graphics/signal-wait-passenger.png",
+    icon_size = 32,
+    subgroup = "virtual-signal-stringytrains",
+    order = "z[stringytrains]-[9]"
   }
 })
