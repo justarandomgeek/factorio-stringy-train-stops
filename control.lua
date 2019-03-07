@@ -135,6 +135,7 @@ function parseScheduleEntry(signals)
       compare_type="and",
     })
   end
+  return schedule
 end
 
 function updateStringyStation(entity)
