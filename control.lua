@@ -80,6 +80,63 @@ function get_signal_from_set(signal,set)
   return nil
 end
 
+function parseScheduleEntry(signals)
+  local string = remote.call('signalstrings','signals_to_string',signals)
+  local schedule = {station=string, wait_conditions = {}}
+
+
+  local sigwaitt = get_signal_from_set({name="signal-wait-time",type="virtual"},signals) or 0
+  if sigwaitt > 0 then
+    table.insert(schedule.wait_conditions, {
+      type="time",
+      compare_type="and",
+      ticks = sigwaitt
+    })
+  end
+  local sigwaiti = get_signal_from_set({name="signal-wait-inactivity",type="virtual"},signals) or 0
+  if sigwaiti > 0 then
+    table.insert(schedule.wait_conditions, {
+      type="inactivity",
+      compare_type="and",
+      ticks = sigwaiti
+    })
+  end
+  local sigwaite = get_signal_from_set({name="signal-wait-empty",type="virtual"},signals) or 0
+  if sigwaite > 0 then
+    table.insert(schedule.wait_conditions, {
+      type="empty",
+      compare_type="and",
+    })
+  end
+  local sigwaitf = get_signal_from_set({name="signal-wait-full",type="virtual"},signals) or 0
+  if sigwaitf > 0 then
+    table.insert(schedule.wait_conditions, {
+      type="full",
+      compare_type="and",
+    })
+  end
+  local sigwaitc = get_signal_from_set({name="signal-wait-circuit",type="virtual"},signals) or 0
+  if sigwaitc > 0 then
+    table.insert(schedule.wait_conditions, {
+      type="circuit",
+      compare_type="and",
+      condition = { first_signal = {name="signal-black",type="virtual"}, comparator = "≠" }
+    })
+  end
+  local sigwaitp = get_signal_from_set({name="signal-wait-passenger",type="virtual"},signals) or 0
+  if sigwaitp > 0 then
+    table.insert(schedule.wait_conditions, {
+      type="passenger_present",
+      compare_type="and",
+    })
+  elseif sigwaitp < 0 then
+    table.insert(schedule.wait_conditions, {
+      type="passenger_not_present",
+      compare_type="and",
+    })
+  end
+end
+
 function updateStringyStation(entity)
   local signals = entity.get_merged_signals()
 
@@ -98,60 +155,14 @@ function updateStringyStation(entity)
       if not global.schedules then global.schedules = {} end
       if not global.schedules[entity.unit_number] then global.schedules[entity.unit_number] = {} end
 
-      local string = remote.call('signalstrings','signals_to_string',signals)
-      if string == "" then return end
-      global.schedules[entity.unit_number][sigsched] = {station=string, wait_conditions = {}}
+      local schedule = parseScheduleEntry(signals)
 
-      local sigwaitt = get_signal_from_set({name="signal-wait-time",type="virtual"},signals) or 0
-      if sigwaitt > 0 then
-        table.insert(global.schedules[entity.unit_number][sigsched].wait_conditions, {
-          type="time",
-          compare_type="and",
-          ticks = sigwaitt
-        })
+      if schedule.name == "" then
+        global.schedules[entity.unit_number][sigsched] = {}
+      else
+        global.schedules[entity.unit_number][sigsched] = schedule
       end
-      local sigwaiti = get_signal_from_set({name="signal-wait-inactivity",type="virtual"},signals) or 0
-      if sigwaiti > 0 then
-        table.insert(global.schedules[entity.unit_number][sigsched].wait_conditions, {
-          type="inactivity",
-          compare_type="and",
-          ticks = sigwaiti
-        })
-      end
-      local sigwaite = get_signal_from_set({name="signal-wait-empty",type="virtual"},signals) or 0
-      if sigwaite > 0 then
-        table.insert(global.schedules[entity.unit_number][sigsched].wait_conditions, {
-          type="empty",
-          compare_type="and",
-        })
-      end
-      local sigwaitf = get_signal_from_set({name="signal-wait-full",type="virtual"},signals) or 0
-      if sigwaitf > 0 then
-        table.insert(global.schedules[entity.unit_number][sigsched].wait_conditions, {
-          type="full",
-          compare_type="and",
-        })
-      end
-      local sigwaitc = get_signal_from_set({name="signal-wait-circuit",type="virtual"},signals) or 0
-      if sigwaitc > 0 then
-        table.insert(global.schedules[entity.unit_number][sigsched].wait_conditions, {
-          type="circuit",
-          compare_type="and",
-          condition = { first_signal = {name="signal-black",type="virtual"}, comparator = "≠" }
-        })
-      end
-      local sigwaitp = get_signal_from_set({name="signal-wait-passenger",type="virtual"},signals) or 0
-      if sigwaitp > 0 then
-        table.insert(global.schedules[entity.unit_number][sigsched].wait_conditions, {
-          type="passenger_present",
-          compare_type="and",
-        })
-      elseif sigwaitp < 0 then
-        table.insert(global.schedules[entity.unit_number][sigsched].wait_conditions, {
-          type="passenger_not_present",
-          compare_type="and",
-        })
-      end
+
       return
     elseif sigsched == -1 then
       -- set schedule, send to first
@@ -228,3 +239,7 @@ function notNil(class, var)
 	end)
 	return value
 end
+
+remote.add_interface("stringy-train-stop",{
+  parseScheduleEntry = parseScheduleEntry
+})
