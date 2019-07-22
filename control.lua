@@ -80,9 +80,26 @@ function get_signal_from_set(signal,set)
   return nil
 end
 
-function parseScheduleEntry(signals)
-  local string = remote.call('signalstrings','signals_to_string',signals)
-  local schedule = {station=string, wait_conditions = {}}
+function parseScheduleEntry(signals,surface)
+  local schedule = {wait_conditions = {}}
+
+  local userail = get_signal_from_set({name="rail",type="item"},signals) or 0
+  if userail ~= 0 then 
+    local x = get_signal_from_set({name="signal-X",type="virtual"},signals) or 0
+    local y = get_signal_from_set({name="signal-Y",type="virtual"},signals) or 0
+
+    x = x - (x % 2)
+    y = y - (y % 2)
+
+    local rails = surface.find_entities_filtered{type={"straight-rail","curved-rail"},area={{x,y},{x+1,y+1}}}
+    if rails and rails[1] then
+      schedule.rail = rails[1]
+    end
+
+  else
+    local string = remote.call('signalstrings','signals_to_string',signals)
+    schedule.station = string
+  end
 
 
   local sigwaitt = get_signal_from_set({name="signal-wait-time",type="virtual"},signals) or 0
@@ -156,7 +173,7 @@ function updateStringyStation(entity)
       if not global.schedules then global.schedules = {} end
       if not global.schedules[entity.unit_number] then global.schedules[entity.unit_number] = {} end
 
-      local schedule = parseScheduleEntry(signals)
+      local schedule = parseScheduleEntry(signals,entity.surface)
 
       if schedule.name == "" then
         global.schedules[entity.unit_number][sigsched] = {}
