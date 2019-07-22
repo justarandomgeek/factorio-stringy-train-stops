@@ -91,11 +91,18 @@ function parseScheduleEntry(signals,surface)
     x = x - (x % 2)
     y = y - (y % 2)
 
-    local rails = surface.find_entities_filtered{type={"straight-rail","curved-rail"},area={{x,y},{x+1,y+1}}}
-    if rails and rails[1] then
-      schedule.rail = rails[1]
-    end
-
+    if surface and surface.valid then
+      local rails = surface.find_entities_filtered{type={"straight-rail","curved-rail"},area={{x,y},{x+1,y+1}}}
+      if rails and rails[1] then
+        schedule.rail = rails[1]
+      else
+        -- list as "Invalid"
+        schedule.station = ""
+      end
+    else
+      -- list as "Invalid"
+      schedule.station = ""
+    end  
   else
     local string = remote.call('signalstrings','signals_to_string',signals)
     schedule.station = string
