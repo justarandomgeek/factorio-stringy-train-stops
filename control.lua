@@ -1,3 +1,27 @@
+local knownsignals = {
+  parseSchedule = {
+    richtext = {name="signal-stopname-richtext",type="virtual"},
+    schedulerail = {name="signal-schedule-rail",type="virtual"},
+    X = {name="signal-X",type="virtual"},
+    Y = {name="signal-Y",type="virtual"},
+    
+    wait_time = {name="signal-wait-time",type="virtual"},
+    wait_inactivity = {name="signal-wait-inactivity",type="virtual"},
+    wait_empty = {name="signal-wait-empty",type="virtual"},
+    wait_full = {name="signal-wait-full",type="virtual"},
+    wait_passenger = {name="signal-wait-passenger",type="virtual"},
+    wait_circuit = {name="signal-wait-circuit",type="virtual"},
+  },
+  updateStation = {
+    richtext = {name="signal-stopname-richtext",type="virtual"},
+    schedule = {name="signal-schedule",type="virtual"},
+    stopname = {name="signal-stopname",type="virtual"},
+    go = {name="signal-goto",type="virtual"},
+  }
+
+} 
+
+
 script.on_event(defines.events.on_built_entity, function(event)
   if (event.created_entity.name == "stringy-train-stop") then
     addDTSToTable(event.created_entity)
@@ -71,22 +95,33 @@ function removeStringyStation(entity)
 	end
 end
 
-function get_signal_from_set(signal,set)
-  for _,sig in pairs(set) do
-    if sig.signal.type == signal.type and sig.signal.name == signal.name then
-      return sig.count
+function get_signals_filtered(filters,signals)
+  --   filters = {
+  --  SignalID,
+  --  }
+  local results = {}
+  local count = 0
+  for _,sig in pairs(signals) do
+    for i,f in pairs(filters) do
+      if f.name and sig.signal.type == f.type and sig.signal.name == f.name then
+        results[i] = sig.count
+        count = count + 1
+        if count == #filters then return results end
+      end
     end
   end
-  return nil
+  return results
 end
 
 function parseScheduleEntry(signals,surface)
+  local knownsigs = get_signals_filtered(knownsignals.parseSchedule,signals)
+
   local schedule = {wait_conditions = {}}
 
-  local userail = get_signal_from_set({name="rail",type="item"},signals) or 0
+  local userail = knownsigs.schedulerail or 0
   if userail ~= 0 then 
-    local x = get_signal_from_set({name="signal-X",type="virtual"},signals) or 0
-    local y = get_signal_from_set({name="signal-Y",type="virtual"},signals) or 0
+    local x = knownsigs.X or 0
+    local y = knownsigs.Y or 0
 
     x = x - (x % 2)
     y = y - (y % 2)
@@ -104,12 +139,12 @@ function parseScheduleEntry(signals,surface)
       schedule.station = ""
     end  
   else
-    local string = remote.call('signalstrings','signals_to_string',signals)
+    local string = remote.call('signalstrings','signals_to_string',signals,knownsigs.richtext or false)
     schedule.station = string
   end
 
 
-  local sigwaitt = get_signal_from_set({name="signal-wait-time",type="virtual"},signals) or 0
+  local sigwaitt = knownsigs.wait_time or 0
   if sigwaitt > 0 then
     table.insert(schedule.wait_conditions, {
       type="time",
@@ -117,7 +152,7 @@ function parseScheduleEntry(signals,surface)
       ticks = sigwaitt
     })
   end
-  local sigwaiti = get_signal_from_set({name="signal-wait-inactivity",type="virtual"},signals) or 0
+  local sigwaiti = knownsigs.wait_inactivity or 0
   if sigwaiti > 0 then
     table.insert(schedule.wait_conditions, {
       type="inactivity",
@@ -125,21 +160,21 @@ function parseScheduleEntry(signals,surface)
       ticks = sigwaiti
     })
   end
-  local sigwaite = get_signal_from_set({name="signal-wait-empty",type="virtual"},signals) or 0
+  local sigwaite = knownsigs.wait_empty or 0
   if sigwaite > 0 then
     table.insert(schedule.wait_conditions, {
       type="empty",
       compare_type="and",
     })
   end
-  local sigwaitf = get_signal_from_set({name="signal-wait-full",type="virtual"},signals) or 0
+  local sigwaitf = knownsigs.wait_full or 0
   if sigwaitf > 0 then
     table.insert(schedule.wait_conditions, {
       type="full",
       compare_type="and",
     })
   end
-  local sigwaitc = get_signal_from_set({name="signal-wait-circuit",type="virtual"},signals) or 0
+  local sigwaitc = knownsigs.wait_circuit or 0
   if sigwaitc > 0 then
     table.insert(schedule.wait_conditions, {
       type="circuit",
@@ -147,7 +182,7 @@ function parseScheduleEntry(signals,surface)
       condition = { first_signal = {name="signal-black",type="virtual"}, comparator = "≠" }
     })
   end
-  local sigwaitp = get_signal_from_set({name="signal-wait-passenger",type="virtual"},signals) or 0
+  local sigwaitp = knownsigs.wait_passenger or 0
   if sigwaitp > 0 then
     table.insert(schedule.wait_conditions, {
       type="passenger_present",
@@ -164,17 +199,19 @@ end
 
 function updateStringyStation(entity)
   local signals = entity.get_merged_signals()
+  
+  if signals and #signals >0 then
+    local knownsigs = get_signals_filtered(knownsignals.updateStation,signals)
 
-  if signals and #signals > 0 then
-    if (get_signal_from_set({name="signal-stopname",type="virtual"},signals) or 0) == 1 then
+    if (knownsigs.stopname or 0) == 1 then
       -- rename station
-      local string = remote.call('signalstrings','signals_to_string',signals)
+      local string = remote.call('signalstrings','signals_to_string',signals,knownsigs.richtext or false)
       if string ~= entity.backer_name then
   			renameStringyStation(entity, string)
   		end
       return
     end
-    local sigsched = get_signal_from_set({name="signal-schedule",type="virtual"},signals) or 0
+    local sigsched = knownsigs.schedule or 0
     if sigsched > 0 then
       -- build schedule
       if not global.schedules then global.schedules = {} end
@@ -193,8 +230,6 @@ function updateStringyStation(entity)
       -- set schedule, send to first
       for _,train in pairs(entity.surface.find_entities_filtered{area={{x=entity.position.x-2,y=entity.position.y-2},{x=entity.position.x+2,y=entity.position.y+2}},type='locomotive'}) do
         if train.train.state == defines.train_state.wait_station and train.train.station == entity then
-
-          --game.print(serpent.block({ current = 1, records = schedules[entity.unit_number]}))
           train.train.manual_mode = true
           train.train.schedule = { current = 1, records = global.schedules[entity.unit_number]}
           train.train.manual_mode = false
@@ -203,11 +238,11 @@ function updateStringyStation(entity)
       end
       return
     end
-    if (get_signal_from_set({name="signal-goto",type="virtual"},signals) or 0) ~= 0 then
+    if (knownsigs.go or 0) ~= 0 then
       -- send train to named station
       for _,train in pairs(entity.surface.find_entities_filtered{area={{x=entity.position.x-2,y=entity.position.y-2},{x=entity.position.x+2,y=entity.position.y+2}},type='locomotive'}) do
         if train.train.state == defines.train_state.wait_station and train.train.station == entity then
-          local string = remote.call('signalstrings','signals_to_string',signals)
+          local string = remote.call('signalstrings','signals_to_string',signals,knownsigs.richtext or false)
 
           train.train.manual_mode = true
           train.train.schedule = { current = 1, records = {{station=string}}}
