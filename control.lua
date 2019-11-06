@@ -228,12 +228,14 @@ function updateStringyStation(entity)
       return
     elseif sigsched == -1 then
       -- set schedule, send to first
-      for _,train in pairs(entity.surface.find_entities_filtered{area={{x=entity.position.x-2,y=entity.position.y-2},{x=entity.position.x+2,y=entity.position.y+2}},type='locomotive'}) do
-        if train.train.state == defines.train_state.wait_station and train.train.station == entity then
-          train.train.manual_mode = true
-          train.train.schedule = { current = 1, records = global.schedules[entity.unit_number]}
-          train.train.manual_mode = false
-          global.schedules[entity.unit_number] = {}
+      if global.schedules[entity.unit_number][1] then
+        for _,train in pairs(entity.surface.find_entities_filtered{area={{x=entity.position.x-2,y=entity.position.y-2},{x=entity.position.x+2,y=entity.position.y+2}},type='locomotive'}) do
+          if train.train.state == defines.train_state.wait_station and train.train.station == entity then
+            train.train.manual_mode = true
+            train.train.schedule = { current = 1, records = global.schedules[entity.unit_number]}
+            train.train.manual_mode = false
+            global.schedules[entity.unit_number] = {}
+          end
         end
       end
       return
