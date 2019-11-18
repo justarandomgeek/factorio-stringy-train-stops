@@ -307,13 +307,8 @@ function updateStringyStation(entity)
       if not global.schedules[entity.unit_number] then global.schedules[entity.unit_number] = {} end
 
       local schedule = parseScheduleEntry(signals,entity.surface)
-
-      if schedule.name == "" then
-        global.schedules[entity.unit_number][sigsched] = {}
-      else
-        global.schedules[entity.unit_number][sigsched] = schedule
-      end
-
+      global.schedules[entity.unit_number][sigsched] = schedule
+      
       return
     elseif sigsched == -1 then
       -- set schedule, send to first
