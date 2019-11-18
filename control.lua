@@ -11,6 +11,9 @@ local knownsignals = {
     wait_full = {name="signal-wait-full",type="virtual"},
     wait_passenger = {name="signal-wait-passenger",type="virtual"},
     wait_circuit = {name="signal-wait-circuit",type="virtual"},
+    wait_robots = {name="signal-wait-robots",type="virtual"},
+
+    info = {name="signal-info",type="virtual"},
   },
   updateStation = {
     richtext = {name="signal-stopname-richtext",type="virtual"},
@@ -113,6 +116,85 @@ function get_signals_filtered(filters,signals)
   return results
 end
 
+-- signal-info used to report errors
+-- 0000|0000|0000|0000||0000|0000|0000|0000
+--     |    |    |    ||    |    |xxxx|xxxx number of omitted wait conditions
+--     |    |    |   1||    |    |    |     contains item_count wait condition
+--     |    |    |  1 ||    |    |    |     contains fluid_count wait condition
+--     |    |    | 1  ||    |    |    |     contains circuit wait condition other than black!=0
+--     |    |    |1   ||    |    |    |     contains contradictory passenger conditions
+--     |   1|    |    ||    |    |    |     contains "OR" conditions
+
+function reportScheduleEntry(schedule)
+  local outsignals = {}
+  if schedule.rail then
+    local position = schedule.rail.position
+    outsignals[#outsignals+1]={index=#outsignals+1,count=position.x,signal=knownsignals.parseSchedule.X}
+    outsignals[#outsignals+1]={index=#outsignals+1,count=position.y,signal=knownsignals.parseSchedule.Y}
+  elseif schedule.station then
+    outsignals = remote.call('signalstrings','string_to_signals', schedule.station)
+  end
+  local waits = {}
+  local waittype = {
+    -- no arguments
+    full = function() waits.wait_full = 1 end,
+    empty = function() waits.wait_empty = 1 end,
+    robots_inactive = function() waits.wait_robots = 1 end,
+  
+    -- value is time in ticks
+    time = function(wait) waits.wait_time = wait.ticks end,
+    inactivity = function(wait) waits.wait_inactivity = wait.ticks end,
+    
+    -- no signal for these, report as info
+    item_count = function()
+      wait.info = bit32.bor((wait.info or 0)+1, 0x10000)
+    end,
+    fluid_count = function()
+      wait.info = bit32.bor((wait.info or 0)+1, 0x20000)
+    end,
+  
+    -- no signal format for circuit conditions except black!=0, report those as an error bit on info too
+    circuit = function(wait)
+      local condition = wait.condition
+      if condition.first_signal and condition.first_signal.name == "signal-black" and 
+          condition.comparator == "≠" and 
+          not condition.second_signal and condition.constant == 0 then
+        waits.wait_circuit = 1
+      else
+        wait.info = bit32.bor((wait.info or 0)+1, 0x40000)
+      end
+    end,
+  
+    -- these share a signal, set an info bit if both present.
+    passenger_present = function(wait)
+      if not waits.wait_passenger then
+        waits.wait_passenger = 1
+      elseif waits.wait_passenger == -1 then
+        wait.info = bit32.bor((wait.info or 0)+1, 0x80000)
+      end
+    end,
+    passenger_not_present = function(wait)
+      if not waits.wait_passenger then
+        waits.wait_passenger = -1
+      elseif waits.wait_passenger == 1 then
+        wait.info = bit32.bor((wait.info or 0)+1, 0x80000)
+      end
+    end,
+  }
+  for i,wait in pairs(schedule.wait_conditions) do
+    if wait.compare_type == "or" then 
+      wait.info = bit32.bor((wait.info or 0)+1+(#wait - i), 0x01000000)
+      break
+    else
+      waittype[wait.type](wait)
+    end
+  end
+  for name,value in pairs(waits) do
+    outsignals[#outsignals+1]={index=#outsignals+1,count=value,signal=knownsignals.parseSchedule[name]}
+  end
+  return outsignals
+end
+
 function parseScheduleEntry(signals,surface)
   local knownsigs = get_signals_filtered(knownsignals.parseSchedule,signals)
 
@@ -191,6 +273,13 @@ function parseScheduleEntry(signals,surface)
   elseif sigwaitp < 0 then
     table.insert(schedule.wait_conditions, {
       type="passenger_not_present",
+      compare_type="and",
+    })
+  end
+  local sigwaitr = knownsigs.wait_robots or 0
+  if sigwaitr > 0 then
+    table.insert(schedule.wait_conditions, {
+      type="robots_inactive",
       compare_type="and",
     })
   end
@@ -303,5 +392,6 @@ function notNil(class, var)
 end
 
 remote.add_interface("stringy-train-stop",{
-  parseScheduleEntry = parseScheduleEntry
+  reportScheduleEntry = reportScheduleEntry,
+  parseScheduleEntry = parseScheduleEntry,
 })

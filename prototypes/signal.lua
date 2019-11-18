@@ -20,7 +20,7 @@ data:extend(
     icon = "__stringy-train-stop__/graphics/signal-stopname-richtext.png",
     icon_size = 32,
     subgroup = "virtual-signal-stringytrains",
-    order = "z[stringytrains]-[10]"
+    order = "z[stringytrains]-[11]"
   },
   {
     type = "virtual-signal",
@@ -60,7 +60,7 @@ data:extend(
     icon = "__stringy-train-stop__/graphics/signal-wait-inactivity.png",
     icon_size = 32,
     subgroup = "virtual-signal-stringytrains",
-    order = "z[stringytrains]-[50]"
+    order = "z[stringytrains]-[41]"
   },
   {
     type = "virtual-signal",
@@ -68,7 +68,7 @@ data:extend(
     icon = "__stringy-train-stop__/graphics/signal-wait-empty.png",
     icon_size = 32,
     subgroup = "virtual-signal-stringytrains",
-    order = "z[stringytrains]-[60]"
+    order = "z[stringytrains]-[42]"
   },
   {
     type = "virtual-signal",
@@ -76,7 +76,7 @@ data:extend(
     icon = "__stringy-train-stop__/graphics/signal-wait-full.png",
     icon_size = 32,
     subgroup = "virtual-signal-stringytrains",
-    order = "z[stringytrains]-[70]"
+    order = "z[stringytrains]-[43]"
   },
   {
     type = "virtual-signal",
@@ -84,7 +84,7 @@ data:extend(
     icon = "__stringy-train-stop__/graphics/signal-wait-circuit.png",
     icon_size = 32,
     subgroup = "virtual-signal-stringytrains",
-    order = "z[stringytrains]-[80]"
+    order = "z[stringytrains]-[45]"
   },
   {
     type = "virtual-signal",
@@ -92,6 +92,14 @@ data:extend(
     icon = "__stringy-train-stop__/graphics/signal-wait-passenger.png",
     icon_size = 32,
     subgroup = "virtual-signal-stringytrains",
-    order = "z[stringytrains]-[90]"
+    order = "z[stringytrains]-[46]"
+  },
+  {
+    type = "virtual-signal",
+    name = "signal-wait-robots",
+    icon = "__stringy-train-stop__/graphics/signal-wait-robots.png",
+    icon_size = 32,
+    subgroup = "virtual-signal-stringytrains",
+    order = "z[stringytrains]-[47]"
   }
 })
