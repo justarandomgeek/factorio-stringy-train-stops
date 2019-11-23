@@ -1,3 +1,5 @@
+pcall(require,'__coverage__/coverage.lua')
+
 local knownsignals = {
   parseSchedule = {
     richtext = {name="signal-stopname-richtext",type="virtual"},
