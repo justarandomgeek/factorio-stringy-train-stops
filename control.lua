@@ -194,7 +194,8 @@ function reportScheduleEntry(schedule)
   for name,value in pairs(waits) do
     outsignals[#outsignals+1]={index=#outsignals+1,count=value,signal=knownsignals.parseSchedule[name]}
   end
-  return outsignals
+  --Array of frames, for future expansion to multi-frame reports of OR groups
+  return {outsignals}
 end
 
 function parseScheduleEntry(signals,surface)
