@@ -14,6 +14,7 @@ To program multiple stops, send a series of stops as:
    * signal-wait-inactivitiy = time to wait
    * signal-wait-empty
    * signal-wait-full
+   * signal-wait-robots
    * signal-wait-circuit - will wait for signal-black
    * signal-wait-passenger - positive values will wait for a passenger, negative will wait for the passenger to get out.
 
