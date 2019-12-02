@@ -148,10 +148,10 @@ function reportScheduleEntry(schedule)
     inactivity = function(wait) waits.wait_inactivity = wait.ticks end,
     
     -- no signal for these, report as info
-    item_count = function()
+    item_count = function(wait)
       wait.info = bit32.bor((wait.info or 0)+1, 0x10000)
     end,
-    fluid_count = function()
+    fluid_count = function(wait)
       wait.info = bit32.bor((wait.info or 0)+1, 0x20000)
     end,
   
