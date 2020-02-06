@@ -86,13 +86,6 @@ script.on_configuration_changed(function(data)
   end
 end)
 
-function onTick()
-  for _,station in pairs(global.stringyStations) do
-    updateStringyStation(station)
-  end
-end
-script.on_event(defines.events.on_tick, onTick)
-
 
 function get_signals_filtered(filters,signals)
   --   filters = {
@@ -283,6 +276,52 @@ function parseScheduleEntry(signals,surface)
   return schedule
 end
 
+
+
+function renameStringyStation(entity, stationNewName)
+  stationName = entity.name
+  stationSurface = entity.surface
+	stationPosition = entity.position
+	stationDirection = entity.direction
+	stationForce = entity.force
+	stationCircuits = entity.circuit_connection_definitions
+
+	stationControlBehavior = entity.get_control_behavior()
+
+	stationSendToTrain = stationControlBehavior.send_to_train
+	stationReadFromTrain = stationControlBehavior.read_from_train
+	stationReadStoppedTrain = stationControlBehavior.read_stopped_train
+	stationEnableDisable = stationControlBehavior.enable_disable
+	stationStoppedTrainSignal = stationControlBehavior.stopped_train_signal
+	stationCircuitCondition = stationControlBehavior.circuit_condition
+  
+  global.stringyStations[entity.unit_number] = nil
+	entity.destroy{raise_destroy=true}
+	newStation = stationSurface.create_entity{
+        name = stationName, 
+        position = stationPosition, 
+        direction = stationDirection, 
+        force = stationForce, 
+        create_build_effect_smoke = false
+      }
+	for i, wire in ipairs(stationCircuits) do
+		newStation.connect_neighbour(wire)
+	end
+
+	newStationControlBehavior = newStation.get_control_behavior()
+
+	newStationControlBehavior.send_to_train = stationSendToTrain
+	newStationControlBehavior.read_from_train = stationReadFromTrain
+	newStationControlBehavior.read_stopped_train = stationReadStoppedTrain
+	newStationControlBehavior.enable_disable = stationEnableDisable
+	newStationControlBehavior.stopped_train_signal = stationStoppedTrainSignal
+	newStationControlBehavior.circuit_condition = stationCircuitCondition
+	newStation.backer_name = stationNewName
+  global.stringyStations[newStation.unit_number] = newStation
+	
+end
+
+
 function updateStringyStation(entity)
   local signals = entity.get_merged_signals()
   
@@ -293,9 +332,8 @@ function updateStringyStation(entity)
       -- rename station
       local newName = remote.call('signalstrings','signals_to_string',signals,knownsigs.richtext or false)
       if newName ~= entity.backer_name then
-  			  debug("Renamed Stringy Station #",entity.unit_number,": '",entity.backer_name,"' to '",newName)
-          entity.backer_name = newName
-  		end
+  			  return {entity=entity, newName=newName}
+      end
       return
     end
     local sigsched = knownsigs.schedule or 0
@@ -338,6 +376,22 @@ function updateStringyStation(entity)
     end
   end
 end
+
+
+function onTick()
+  local removeStations = {}
+  for _,station in pairs(global.stringyStations) do
+    local value = updateStringyStation(station)
+    if value then
+      table.insert(removeStations, value)
+    end
+  end
+  for _,set in pairs(removeStations) do
+    renameStringyStation(set.entity, set.newName)
+  end
+end
+script.on_event(defines.events.on_tick, onTick)
+
 
 remote.add_interface("stringy-train-stop",{
   reportScheduleEntry = reportScheduleEntry,
