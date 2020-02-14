@@ -379,14 +379,14 @@ end
 
 
 function onTick()
-  local removeStations = {}
+  local renameStations = {}
   for _,station in pairs(global.stringyStations) do
     local value = updateStringyStation(station)
     if value then
-      table.insert(removeStations, value)
+      table.insert(renameStations, value)
     end
   end
-  for _,set in pairs(removeStations) do
+  for _,set in pairs(renameStations) do
     renameStringyStation(set.entity, set.newName)
   end
 end
