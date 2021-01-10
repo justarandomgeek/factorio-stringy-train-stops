@@ -21,95 +21,25 @@ local knownsignals = {
     stopname = {name="signal-stopname",type="virtual"},
     go = {name="signal-goto",type="virtual"},
   }
+}
 
-} 
+local events = {
+  on_renamed_station = script.generate_event_name(),
+}
 
-
-script.on_event(defines.events.on_built_entity, function(event)
-  if (event.created_entity.name == "stringy-train-stop") then
-    addDTSToTable(event.created_entity)
-    end
-end)
-
-script.on_event(defines.events.on_robot_built_entity, function(event)
-  if (event.created_entity.name == "stringy-train-stop") then
-    addDTSToTable(event.created_entity)
-  end
-end)
-
-script.on_event(defines.events.on_pre_player_mined_item, function(event)
-  removeStringyStation(event.entity)
-end)
-
-script.on_event(defines.events.on_robot_pre_mined, function(event)
-  removeStringyStation(event.entity)
-end)
-
-script.on_event(defines.events.on_entity_died, function(event)
-  removeStringyStation(event.entity)
-end)
-
-
-script.on_init(function()
-  global = {
-    stringyStations = {},
-    schedules = {},
-  }
-  onLoad()
-end)
-
-script.on_configuration_changed(function(event)
-  if not global.stringyStations then
-    global.stringyStations = {}
-  end
-  if not global.schedules then
-    global.schedules = {}
-  end
-end)
-
-
-
-script.on_event(defines.events.on_tick, function(event)
-    for i, stringy_station in ipairs(stringy_stations) do
-     updateStringyStation(stringy_station)
-   end
-end)
-
-script.on_load(function()
-  onLoad()
-end)
-
-function onLoad()
-  stringy_stations = global.stringyStations
-end
-
-function addDTSToTable(entity)
-  table.insert(stringy_stations, entity)
-end
-
-function removeStringyStation(entity)
-	for i, stringy_station in ipairs(stringy_stations) do
-		if notNil(stringy_station, "position") then
-			if stringy_station.position.x == entity.position.x and stringy_station.position.y == entity.position.y then
-				table.remove(stringy_stations, i)
-				break
-			end
-		end
-	end
-end
-
-function get_signals_filtered(filters,signals)
+local function get_signals_filtered(filters,signals)
   --   filters = {
   --  SignalID,
   --  }
   local results = {}
+  local numfilters = table_size(filters)
   local count = 0
   for _,sig in pairs(signals) do
     for i,f in pairs(filters) do
       if f.name and sig.signal.type == f.type and sig.signal.name == f.name then
         results[i] = sig.count
         count = count + 1
-        if count == #filters then return results end
+        if count == numfilters then return results end
       end
     end
   end
@@ -125,7 +55,7 @@ end
 --     |    |    |1   ||    |    |    |     contains contradictory passenger conditions
 --     |   1|    |    ||    |    |    |     contains "OR" conditions
 
-function reportScheduleEntry(schedule)
+local function reportScheduleEntry(schedule)
   local outsignals = {}
   if schedule.rail then
     local position = schedule.rail.position
@@ -196,7 +126,7 @@ function reportScheduleEntry(schedule)
   return {outsignals}
 end
 
-function parseScheduleEntry(signals,surface)
+local function parseScheduleEntry(signals,surface)
   local knownsigs = get_signals_filtered(knownsignals.parseSchedule,signals)
 
   local schedule = {wait_conditions = {}}
@@ -287,9 +217,60 @@ function parseScheduleEntry(signals,surface)
   return schedule
 end
 
-function updateStringyStation(entity)
+
+local function addDTSToTable(entity)
+  global.stringyStations[entity.unit_number] = { entity = entity, schedule = {}}
+end
+
+local function renameStringyStation(entity, stationNewName)
+  -- we can't just rename the station directly because if it is the only stop
+  -- of that name, it will edit existing schedules to replace the old name with new
+  local create_order = {
+    name = entity.name,
+    position = entity.position,
+    direction = entity.direction,
+    force = entity.force,
+  }
+  local stationUnitNumber = entity.unit_number
+  local stationCircuits = entity.circuit_connection_definitions
+
+  local stationControlBehavior = entity.get_control_behavior()
+
+  local stationSendToTrain = stationControlBehavior.send_to_train
+  local stationReadFromTrain = stationControlBehavior.read_from_train
+  local stationReadStoppedTrain = stationControlBehavior.read_stopped_train
+  local stationEnableDisable = stationControlBehavior.enable_disable
+  local stationStoppedTrainSignal = stationControlBehavior.stopped_train_signal
+  local stationCircuitCondition = stationControlBehavior.circuit_condition
+
+  local surface = entity.surface
+  -- raising destroyed here prevents rename of multiple stations connected together,
+  -- or possibly other updates of multiple unconnected stations in the same tick
+  entity.destroy()
+  local newStation = surface.create_entity(create_order)
+  for i, wire in pairs(stationCircuits) do
+    newStation.connect_neighbour(wire)
+  end
+
+  local newStationControlBehavior = newStation.get_control_behavior()
+
+  newStationControlBehavior.send_to_train = stationSendToTrain
+  newStationControlBehavior.read_from_train = stationReadFromTrain
+  newStationControlBehavior.read_stopped_train = stationReadStoppedTrain
+  newStationControlBehavior.enable_disable = stationEnableDisable
+  newStationControlBehavior.stopped_train_signal = stationStoppedTrainSignal
+  newStationControlBehavior.circuit_condition = stationCircuitCondition
+
+  addDTSToTable(newStation)
+  newStation.backer_name = stationNewName
+  script.raise_event(events.on_renamed_station,{old_unit_number = stationUnitNumber, entity = newStation})
+  return true
+end
+
+local function updateStringyStation(station)
+  local entity = station.entity
+  if not entity.valid then return true end
   local signals = entity.get_merged_signals()
-  
   if signals and #signals >0 then
     local knownsigs = get_signals_filtered(knownsignals.updateStation,signals)
 
@@ -297,29 +278,26 @@ function updateStringyStation(entity)
       -- rename station
       local string = remote.call('signalstrings','signals_to_string',signals,knownsigs.richtext or false)
       if string ~= entity.backer_name then
-  			renameStringyStation(entity, string)
-  		end
+        return renameStringyStation(entity, string)
+      end
       return
     end
     local sigsched = knownsigs.schedule or 0
     if sigsched > 0 then
       -- build schedule
-      if not global.schedules then global.schedules = {} end
-      if not global.schedules[entity.unit_number] then global.schedules[entity.unit_number] = {} end
-
       local schedule = parseScheduleEntry(signals,entity.surface)
-      global.schedules[entity.unit_number][sigsched] = schedule
-      
+      station.schedule[sigsched] = schedule
       return
     elseif sigsched == -1 then
       -- set schedule, send to first
-      if global.schedules[entity.unit_number][1] then
+      if station.schedule[1] then
         for _,train in pairs(entity.surface.find_entities_filtered{area={{x=entity.position.x-2,y=entity.position.y-2},{x=entity.position.x+2,y=entity.position.y+2}},type='locomotive'}) do
           if train.train.state == defines.train_state.wait_station and train.train.station == entity then
             train.train.manual_mode = true
-            train.train.schedule = { current = 1, records = global.schedules[entity.unit_number]}
+            train.train.schedule = { current = 1, records = station.schedule}
             train.train.manual_mode = false
-            global.schedules[entity.unit_number] = {}
+            station.schedule = {}
+            return
           end
         end
       end
@@ -330,10 +308,10 @@ function updateStringyStation(entity)
       for _,train in pairs(entity.surface.find_entities_filtered{area={{x=entity.position.x-2,y=entity.position.y-2},{x=entity.position.x+2,y=entity.position.y+2}},type='locomotive'}) do
         if train.train.state == defines.train_state.wait_station and train.train.station == entity then
           local string = remote.call('signalstrings','signals_to_string',signals,knownsigs.richtext or false)
-
           train.train.manual_mode = true
           train.train.schedule = { current = 1, records = {{station=string}}}
           train.train.manual_mode = false
+          return
         end
       end
       return
@@ -341,53 +319,94 @@ function updateStringyStation(entity)
   end
 end
 
-function renameStringyStation(entity, stationNewName)
-	stationName = entity.name
-	stationPosition = entity.position
-	stationDirection = entity.direction
-	stationForce = entity.force
-	stationCircuits = entity.circuit_connection_definitions
+script.on_event(defines.events.on_built_entity, function(event)
+  if (event.created_entity.name == "stringy-train-stop") then
+    addDTSToTable(event.created_entity)
+  end
+end, {{filter="name",name="stringy-train-stop"}})
 
-	stationControlBehavior = entity.get_control_behavior()
+script.on_event(defines.events.on_robot_built_entity, function(event)
+  if (event.created_entity.name == "stringy-train-stop") then
+    addDTSToTable(event.created_entity)
+  end
+end, {{filter="name",name="stringy-train-stop"}})
 
-	stationSendToTrain = stationControlBehavior.send_to_train
-	stationReadFromTrain = stationControlBehavior.read_from_train
-	stationReadStoppedTrain = stationControlBehavior.read_stopped_train
-	stationEnableDisable = stationControlBehavior.enable_disable
-	stationStoppedTrainSignal = stationControlBehavior.stopped_train_signal
-	stationCircuitCondition = stationControlBehavior.circuit_condition
 
-	removeStringyStation(entity)
-	entity.destroy()
-	newStation = game.surfaces[1].create_entity{name = stationName, position = stationPosition, direction = stationDirection, force = stationForce}
-	for i, wire in ipairs(stationCircuits) do
-		newStation.connect_neighbour(wire)
-	end
+script.on_event(defines.events.on_entity_cloned, function(event)
+  if (event.created_entity.name == "stringy-train-stop") then
+    addDTSToTable(event.destination)
+  end
+end, {{filter="name",name="stringy-train-stop"}})
 
-	newStationControlBehavior = newStation.get_control_behavior()
+script.on_event(defines.events.script_raised_built, function(event)
+  if (event.created_entity.name == "stringy-train-stop") then
+    addDTSToTable(event.entity)
+  end
+end, {{filter="name",name="stringy-train-stop"}})
 
-	newStationControlBehavior.send_to_train = stationSendToTrain
-	newStationControlBehavior.read_from_train = stationReadFromTrain
-	newStationControlBehavior.read_stopped_train = stationReadStoppedTrain
-	newStationControlBehavior.enable_disable = stationEnableDisable
-	newStationControlBehavior.stopped_train_signal = stationStoppedTrainSignal
-	newStationControlBehavior.circuit_condition = stationCircuitCondition
+script.on_event(defines.events.script_raised_revive, function(event)
+  if (event.created_entity.name == "stringy-train-stop") then
+    addDTSToTable(event.entity)
+  end
+end, {{filter="name",name="stringy-train-stop"}})
 
-	addDTSToTable(newStation)
-	newStation.backer_name = stationNewName
-end
+script.on_event(defines.events.on_pre_player_mined_item, function(event)
+  if (event.entity.name == "stringy-train-stop") then
+    global.stringyStations[event.entity.unit_number] = nil
+  end
+end, {{filter="name",name="stringy-train-stop"}})
 
-function notNil(class, var)
-	value = false
-	pcall (function()
-		if class[var] then
-			value = true
-		end
-	end)
-	return value
-end
+script.on_event(defines.events.on_robot_pre_mined, function(event)
+  if (event.entity.name == "stringy-train-stop") then
+    global.stringyStations[event.entity.unit_number] = nil
+  end
+end, {{filter="name",name="stringy-train-stop"}})
+
+script.on_event(defines.events.on_entity_died, function(event)
+  if (event.entity.name == "stringy-train-stop") then
+    global.stringyStations[event.entity.unit_number] = nil
+  end
+end, {{filter="name",name="stringy-train-stop"}})
+
+script.on_event(defines.events.script_raised_destroy, function(event)
+  if (event.entity.name == "stringy-train-stop") then
+    global.stringyStations[event.entity.unit_number] = nil
+  end
+end, {{filter="name",name="stringy-train-stop"}})
+
+script.on_init(function()
+  global = {
+    stringyStations = {
+      -- [unit_number] = {entity=entity,schedule={}}
+    },
+  }
+end)
+
+script.on_configuration_changed(function(event)
+  if global.schedules then
+    local data = {}
+    for _,entity in pairs(global.stringyStations) do
+      if entity.valid then
+        data[entity.unit_number] = { entity = entity, schedule = global.schedules[entity.unit_number] or {} }
+      end
+    end
+    global.stringyStations = data
+    global.schedules = nil
+  elseif not global.stringyStations then
+    global.stringyStations = {}
+  end
+end)
+
+script.on_event(defines.events.on_tick, function()
+  for id, station in pairs(global.stringyStations) do
+    if updateStringyStation(station) then
+      global.stringyStations[id] = nil
+    end
+  end
+end)
 
 remote.add_interface("stringy-train-stop",{
   reportScheduleEntry = reportScheduleEntry,
   parseScheduleEntry = parseScheduleEntry,
+  getEvents = function() return events end,
 })
